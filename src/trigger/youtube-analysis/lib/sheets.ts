@@ -20,15 +20,19 @@ export const SHEET_HEADERS = [
 ];
 
 /**
- * Env vars store the key's line breaks as literal "\n", and dashboards often keep the quotes or spaces
- * that came with a copy-paste from the JSON file. Undo all of that so the PEM parses.
+ * Copy-pasting the key into a dashboard can keep the JSON file's quotes, turn its "\n" escapes into
+ * real line breaks, or drop them entirely — and without line breaks the PEM won't parse. So rebuild it:
+ * take the base64 body between the BEGIN/END markers and re-wrap it at the standard 64 characters.
  */
 function normalizePrivateKey(raw: string): string {
-  let key = raw.trim();
-  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
-    key = key.slice(1, -1);
-  }
-  return key.replace(/\\n/g, "\n").replace(/\r\n/g, "\n").trim() + "\n";
+  const key = raw.replace(/\\n/g, "\n");
+  const match = key.match(/-----BEGIN ([A-Z ]+)-----([\s\S]*?)-----END \1-----/);
+  if (!match) return key.trim();
+
+  const [, label, body] = match;
+  const base64 = body.replace(/[^A-Za-z0-9+/=]/g, "");
+  const lines = base64.match(/.{1,64}/g) ?? [];
+  return `-----BEGIN ${label}-----\n${lines.join("\n")}\n-----END ${label}-----\n`;
 }
 
 /** Exchanges the service account credentials for a short-lived Sheets access token. */
