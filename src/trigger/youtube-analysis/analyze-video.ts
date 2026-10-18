@@ -11,7 +11,8 @@ import { sendAnalysisEmail } from "./send-report-email.js";
  * Main task — trigger with: { "url": "https://www.youtube.com/watch?v=...", "recipientEmail": "optional@example.com" }
  *
  * 1. Fetch video details (YouTube Data API)   2. Fetch transcript (youtubei.js, free)
- * 3. Analyze with Gemini (free tier)          4. Save a row to Google Sheets (child task)
+ * 3. Analyze with Gemini (free tier) — from the transcript, or by watching the video if there is none
+ * 4. Save a row to Google Sheets (child task)
  * 5. Email the report via Gmail (child task)
  */
 export const analyzeYoutubeVideo = schemaTask({
@@ -50,12 +51,21 @@ export const analyzeYoutubeVideo = schemaTask({
         truncated: transcript.truncated,
       });
     } else {
-      logger.warn("Transcript unavailable — analyzing title and description only", { reason: transcript.reason });
+      logger.warn("Transcript unavailable — Gemini will watch the video instead", { reason: transcript.reason });
     }
 
-    // 3. AI analysis
-    const analysis = await analyzeWithGemini({ apiKey: geminiApiKey, model: geminiModel, metadata, transcript });
+    // 3. AI analysis (transcript → the video itself → title + description)
+    const { analysis, source, videoError } = await analyzeWithGemini({
+      apiKey: geminiApiKey,
+      model: geminiModel,
+      metadata,
+      transcript,
+    });
+    if (videoError) {
+      logger.warn("Gemini couldn't analyze the video itself — used title and description only", { videoError });
+    }
     logger.log("Gemini analysis complete", {
+      source,
       keyTakeaways: analysis.keyTakeaways.length,
       actionItems: analysis.actionItems.length,
     });
@@ -68,6 +78,7 @@ export const analyzeYoutubeVideo = schemaTask({
         transcript.status === "available"
           ? `language: ${transcript.language ?? "unknown"}${transcript.truncated ? ", truncated" : ""}`
           : transcript.reason,
+      analysisSource: source,
       analysis,
     };
 
@@ -99,6 +110,7 @@ export const analyzeYoutubeVideo = schemaTask({
       videoId,
       title: metadata.title,
       transcriptStatus: report.transcriptStatus,
+      analysisSource: source,
       sheetRange: sheetResult.ok ? sheetResult.output.updatedRange : null,
       emailMessageId: emailResult.ok ? emailResult.output.messageId : null,
       analysis,

@@ -39,14 +39,20 @@ export function parseVideoId(input: string): string | null {
   return candidate && VIDEO_ID_RE.test(candidate) ? candidate : null;
 }
 
-/** Converts YouTube's ISO-8601 duration (e.g. "PT1H2M3S") to "1:02:03". */
-function formatDuration(iso: string): string {
+/** Converts YouTube's ISO-8601 duration (e.g. "PT1H2M3S") to seconds, or null if it can't be parsed. */
+function parseDurationSeconds(iso: string): number | null {
   const m = iso.match(/^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
-  if (!m) return iso || "unknown";
+  if (!m) return null;
   const [, d, h, min, s] = m.map((v) => Number(v ?? 0));
-  const hours = d * 24 + h;
-  const mm = String(min).padStart(hours ? 2 : 1, "0");
-  const ss = String(s).padStart(2, "0");
+  return ((d * 24 + h) * 60 + min) * 60 + s;
+}
+
+/** Formats seconds as "1:02:03" (or "18:40" when under an hour). */
+function formatDuration(seconds: number | null, iso: string): string {
+  if (seconds === null) return iso || "unknown";
+  const hours = Math.floor(seconds / 3600);
+  const mm = String(Math.floor((seconds % 3600) / 60)).padStart(hours ? 2 : 1, "0");
+  const ss = String(seconds % 60).padStart(2, "0");
   return hours ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
@@ -90,13 +96,17 @@ export async function fetchMetadata(videoId: string, apiKey: string): Promise<Vi
   const item = data.items?.[0];
   if (!item) return null;
 
+  const isoDuration = item.contentDetails?.duration ?? "";
+  const durationSeconds = parseDurationSeconds(isoDuration);
+
   return {
     videoId,
     url: `https://www.youtube.com/watch?v=${videoId}`,
     title: item.snippet?.title ?? "(untitled)",
     channelTitle: item.snippet?.channelTitle ?? "(unknown channel)",
     publishedAt: item.snippet?.publishedAt ?? "",
-    duration: formatDuration(item.contentDetails?.duration ?? ""),
+    duration: formatDuration(durationSeconds, isoDuration),
+    durationSeconds,
     viewCount: toNumber(item.statistics?.viewCount),
     likeCount: toNumber(item.statistics?.likeCount), // hidden like counts come back undefined
     description: item.snippet?.description ?? "",

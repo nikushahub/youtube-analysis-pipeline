@@ -69,7 +69,11 @@ export function reportToRow(report: VideoReport): (string | number)[] {
     metadata.publishedAt.slice(0, 10),
     metadata.duration,
     metadata.viewCount ?? "",
-    report.transcriptStatus === "available" ? "Available" : `Unavailable — ${report.transcriptNote}`,
+    {
+      transcript: "Available",
+      video: `Unavailable — analyzed the video directly (${report.transcriptNote})`,
+      metadata: `Unavailable — ${report.transcriptNote}`,
+    }[report.analysisSource],
     analysis.summary,
     numbered(analysis.keyTakeaways),
     numbered(analysis.actionItems),

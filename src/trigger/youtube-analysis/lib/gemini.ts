@@ -1,6 +1,6 @@
 import { AbortTaskRunError } from "@trigger.dev/sdk";
 import { z } from "zod";
-import type { TranscriptResult, VideoAnalysis, VideoMetadata } from "./types.js";
+import type { AnalysisSource, TranscriptResult, VideoAnalysis, VideoMetadata } from "./types.js";
 
 const analysisSchema = z.object({
   summary: z.string().min(1),
@@ -34,12 +34,12 @@ const responseSchema = {
   propertyOrdering: ["summary", "keyTakeaways", "actionItems", "topics"],
 };
 
-function buildPrompt(metadata: VideoMetadata, transcript: TranscriptResult): string {
-  const source =
-    transcript.status === "available"
-      ? `TRANSCRIPT${transcript.truncated ? " (truncated — the video is very long)" : ""}:\n${transcript.text}`
-      : `NO TRANSCRIPT IS AVAILABLE. Base the analysis only on the title and description, keep it brief, and do not invent details that are not stated there.`;
+// Gemini can watch a public YouTube video straight from its URL (free tier: up to 8 hours of video per day).
+// At low media resolution that costs ~100 tokens per second of video, so cap the length to stay well inside
+// the free tier's per-minute token limit. Longer videos fall back to title + description.
+const MAX_VIDEO_SECONDS = 45 * 60;
 
+function buildPrompt(metadata: VideoMetadata, source: string): string {
   return [
     "You are analyzing a YouTube video for a busy viewer who wants the useful parts without watching it.",
     "Write the analysis in English, even if the video is in another language.",
@@ -54,13 +54,15 @@ function buildPrompt(metadata: VideoMetadata, transcript: TranscriptResult): str
   ].join("\n");
 }
 
-export async function analyzeWithGemini(params: {
+type GeminiPart = { text: string } | { fileData: { fileUri: string } };
+
+async function generateAnalysis(params: {
   apiKey: string;
   model: string;
-  metadata: VideoMetadata;
-  transcript: TranscriptResult;
+  parts: GeminiPart[];
+  lowMediaResolution?: boolean;
 }): Promise<VideoAnalysis> {
-  const { apiKey, model, metadata, transcript } = params;
+  const { apiKey, model, parts, lowMediaResolution } = params;
 
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
@@ -72,11 +74,12 @@ export async function analyzeWithGemini(params: {
         "x-goog-api-key": apiKey,
       },
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: buildPrompt(metadata, transcript) }] }],
+        contents: [{ role: "user", parts }],
         generationConfig: {
           temperature: 0.3,
           responseMimeType: "application/json",
           responseSchema,
+          ...(lowMediaResolution ? { mediaResolution: "MEDIA_RESOLUTION_LOW" } : {}),
         },
       }),
     }
@@ -121,4 +124,50 @@ export async function analyzeWithGemini(params: {
     throw new Error(`Gemini's answer had an unexpected shape: ${result.error.message}`);
   }
   return result.data;
+}
+
+/**
+ * Analyzes the video from the best source available:
+ * 1. the transcript, if we got one;
+ * 2. otherwise the video itself — Gemini watches it from the YouTube URL (works even when YouTube blocks
+ *    caption downloads from Trigger.dev's servers);
+ * 3. otherwise (video too long, daily video quota used up, Gemini busy) just the title + description.
+ */
+export async function analyzeWithGemini(params: {
+  apiKey: string;
+  model: string;
+  metadata: VideoMetadata;
+  transcript: TranscriptResult;
+}): Promise<{ analysis: VideoAnalysis; source: AnalysisSource; videoError?: string }> {
+  const { apiKey, model, metadata, transcript } = params;
+
+  if (transcript.status === "available") {
+    const source = `TRANSCRIPT${transcript.truncated ? " (truncated — the video is very long)" : ""}:\n${transcript.text}`;
+    const analysis = await generateAnalysis({ apiKey, model, parts: [{ text: buildPrompt(metadata, source) }] });
+    return { analysis, source: "transcript" };
+  }
+
+  let videoError: string | undefined;
+  if (metadata.durationSeconds !== null && metadata.durationSeconds <= MAX_VIDEO_SECONDS) {
+    try {
+      const source =
+        "THE VIDEO IS ATTACHED. Watch it (audio and visuals) and base the analysis on what is actually said and shown.";
+      const analysis = await generateAnalysis({
+        apiKey,
+        model,
+        parts: [{ fileData: { fileUri: metadata.url } }, { text: buildPrompt(metadata, source) }],
+        lowMediaResolution: true,
+      });
+      return { analysis, source: "video" };
+    } catch (error) {
+      videoError = error instanceof Error ? error.message : String(error);
+    }
+  } else {
+    videoError = `video is longer than ${MAX_VIDEO_SECONDS / 60} minutes (or its length is unknown)`;
+  }
+
+  const source =
+    "NO TRANSCRIPT IS AVAILABLE. Base the analysis only on the title and description, keep it brief, and do not invent details that are not stated there.";
+  const analysis = await generateAnalysis({ apiKey, model, parts: [{ text: buildPrompt(metadata, source) }] });
+  return { analysis, source: "metadata", videoError };
 }

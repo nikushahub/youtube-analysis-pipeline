@@ -43,10 +43,13 @@ function list(items: string[], ordered: boolean, emptyText: string): string {
 
 export function buildReportHtml(report: VideoReport, sheetUrl: string | null): string {
   const { metadata: m, analysis: a } = report;
-  const transcriptBadge =
-    report.transcriptStatus === "available"
-      ? `<span style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:999px;font-size:12px">Transcript analyzed</span>`
-      : `<span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:999px;font-size:12px">Transcript unavailable — based on title &amp; description</span>`;
+  const badge = (bg: string, fg: string, label: string) =>
+    `<span style="background:${bg};color:${fg};padding:3px 10px;border-radius:999px;font-size:12px">${label}</span>`;
+  const transcriptBadge = {
+    transcript: badge("#dcfce7", "#166534", "Transcript analyzed"),
+    video: badge("#dbeafe", "#1e40af", "Analyzed by watching the video"),
+    metadata: badge("#fef3c7", "#92400e", "Transcript unavailable — based on title &amp; description"),
+  }[report.analysisSource];
 
   const topics = a.topics
     .map(
@@ -110,9 +113,11 @@ export function buildReportText(report: VideoReport, sheetUrl: string | null): s
     `${m.title}`,
     `${m.channelTitle} · ${formatDate(m.publishedAt)} · ${m.duration} · ${formatNumber(m.viewCount)} views`,
     `${m.url}`,
-    report.transcriptStatus === "available"
-      ? `Transcript analyzed.`
-      : `Transcript unavailable — analysis is based on title & description only.`,
+    {
+      transcript: `Transcript analyzed.`,
+      video: `No transcript available — Gemini analyzed the video itself.`,
+      metadata: `Transcript unavailable — analysis is based on title & description only.`,
+    }[report.analysisSource],
     ``,
     `SUMMARY`,
     a.summary,
