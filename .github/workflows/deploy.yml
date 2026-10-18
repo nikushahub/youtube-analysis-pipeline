@@ -24,4 +24,4 @@ jobs:
           # Add this in GitHub → repo → Settings → Secrets and variables → Actions.
           # Value: cloud.trigger.dev → Profile → Personal Access Tokens (starts with tr_pat_)
           TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
-        run: npx trigger.dev@4.7.4 deploy
+        run: npx trigger.dev@4.7.4 deploy --env prod

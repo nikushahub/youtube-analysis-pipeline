@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "npx trigger.dev@4.7.4 dev",
-    "deploy": "npx trigger.dev@4.7.4 deploy",
+    "deploy": "npx trigger.dev@4.7.4 deploy --env prod",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
