@@ -1,4 +1,4 @@
-import { AbortTaskRunError } from "@trigger.dev/sdk";
+import { AbortTaskRunError, wait } from "@trigger.dev/sdk";
 import { z } from "zod";
 import type { AnalysisSource, TranscriptResult, VideoAnalysis, VideoMetadata } from "./types.js";
 
@@ -149,18 +149,25 @@ export async function analyzeWithGemini(params: {
 
   let videoError: string | undefined;
   if (metadata.durationSeconds !== null && metadata.durationSeconds <= MAX_VIDEO_SECONDS) {
-    try {
-      const source =
-        "THE VIDEO IS ATTACHED. Watch it (audio and visuals) and base the analysis on what is actually said and shown.";
-      const analysis = await generateAnalysis({
-        apiKey,
-        model,
-        parts: [{ fileData: { fileUri: metadata.url } }, { text: buildPrompt(metadata, source) }],
-        lowMediaResolution: true,
-      });
-      return { analysis, source: "video" };
-    } catch (error) {
-      videoError = error instanceof Error ? error.message : String(error);
+    const source =
+      "THE VIDEO IS ATTACHED. Watch it (audio and visuals) and base the analysis on what is actually said and shown.";
+    const request = {
+      apiKey,
+      model,
+      parts: [{ fileData: { fileUri: metadata.url } }, { text: buildPrompt(metadata, source) }],
+      lowMediaResolution: true,
+    };
+    // Video requests are heavy, so Gemini's "high demand" (503) and rate-limit (429) replies are common —
+    // give it one more try before settling for title + description.
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        return { analysis: await generateAnalysis(request), source: "video" };
+      } catch (error) {
+        videoError = error instanceof Error ? error.message : String(error);
+        const temporary = /\((429|5\d\d)\)/.test(videoError);
+        if (!temporary || attempt === 2) break;
+        await wait.for({ seconds: 15 });
+      }
     }
   } else {
     videoError = `video is longer than ${MAX_VIDEO_SECONDS / 60} minutes (or its length is unknown)`;

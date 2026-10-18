@@ -77,7 +77,7 @@ export const analyzeYoutubeVideo = schemaTask({
       transcriptNote:
         transcript.status === "available"
           ? `language: ${transcript.language ?? "unknown"}${transcript.truncated ? ", truncated" : ""}`
-          : transcript.reason,
+          : `${transcript.reason}${videoError ? ` | video analysis failed: ${videoError}` : ""}`,
       analysisSource: source,
       analysis,
     };
