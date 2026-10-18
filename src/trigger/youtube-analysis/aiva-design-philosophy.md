@@ -1,0 +1,13 @@
+# Luminous Signal
+
+*A design philosophy for the AIVA+ report. It is the reference for every page `lib/pdf-report.ts` draws.*
+
+**Light arriving out of darkness.** Every surface begins as deep graphite, the colour of a screen in the instant before playback. That darkness is quiet, not empty: it is the medium the signal travels through. Nothing is placed on it casually. Each mark should feel like a point of light that had to earn its place, set down with the patience of someone who has spent a career calibrating instruments and knows that one misplaced pixel is a falsehood.
+
+**One current of colour.** The palette is narrow: graphite, brushed silver and a single electric current that runs from deep cobalt to bright cyan. The blue never floods a surface. It shows up as a thin gradient rule, an index numeral, a pulse at the edge of a page, so the eye learns that colour means *this matters*. Silver handles structure: hairlines, outlines and quiet borders at a fraction of full opacity. Each tone is tuned against its neighbours until the whole reads as one material, the painstaking result of a colourist working in very small increments.
+
+**Constellations and chevrons.** Two forms recur. The first is the constellation: small nodes linked by threads finer than a hair, scattered with mathematical rather than decorative intent. It is the trace of a mind connecting fragments into meaning. The second is the chevron, a forward-pointing angle nested inside itself, which suggests motion, play and attention. These forms stay faint, at the edge of perception, and reward a second look. Both are built geometrically: true circles, exact angles, line weights held constant to the hundredth of a point.
+
+**Measured space.** Composition follows a strict grid, and the grid is mostly air. Large fields of empty graphite give each element room, so that a single number, a single line or a single cluster can carry the whole page. Hierarchy comes from scale and isolation, not from boxes and dividers. Margins are generous and identical on every page; elements align to shared edges so precisely that the structure is felt rather than seen. This is master-level restraint, refined through countless passes.
+
+**Type as instrumentation.** Letterforms are clean and geometric. Large type is light and calm; small type is monospaced, tracked wide and set in capitals, like the labels on a precision instrument. Words are few and exact. They anchor what the composition already shows and never fill space for its own sake. Nothing touches, nothing crowds, nothing falls off the edge. Every page should look meticulously crafted, as if it was printed, held to the light, corrected and printed again, the product of deep expertise and painstaking attention.

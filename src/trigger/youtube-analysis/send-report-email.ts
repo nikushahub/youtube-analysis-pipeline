@@ -2,6 +2,7 @@ import { AbortTaskRunError, logger, task } from "@trigger.dev/sdk";
 import nodemailer from "nodemailer";
 import { requireEnv } from "./lib/env.js";
 import { buildReportHtml, buildReportSubject, buildReportText } from "./lib/email-template.js";
+import { renderReportPdf, reportPdfFilename } from "./lib/pdf-report.js";
 import type { VideoReport } from "./lib/types.js";
 
 export interface SendReportPayload {
@@ -22,6 +23,18 @@ export const sendAnalysisEmail = task({
 
     const sheetUrl = sheetSaved ? `https://docs.google.com/spreadsheets/d/${sheetId}` : null;
 
+    // The branded PDF is a bonus — if it can't be built, the team still gets the email.
+    let attachments: { filename: string; content: Buffer; contentType: string }[] = [];
+    try {
+      const pdf = await renderReportPdf(report);
+      attachments = [{ filename: reportPdfFilename(report), content: pdf, contentType: "application/pdf" }];
+      logger.log("Rendered PDF report", { videoId: report.metadata.videoId, kilobytes: Math.round(pdf.length / 1024) });
+    } catch (error) {
+      logger.warn("Couldn't render the PDF report — sending the email without it", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: { user: gmailUser, pass: gmailAppPassword },
@@ -34,9 +47,14 @@ export const sendAnalysisEmail = task({
         subject: buildReportSubject(report),
         html: buildReportHtml(report, sheetUrl),
         text: buildReportText(report, sheetUrl),
+        attachments,
       });
 
-      logger.log("Report email sent", { videoId: report.metadata.videoId, messageId: info.messageId });
+      logger.log("Report email sent", {
+        videoId: report.metadata.videoId,
+        messageId: info.messageId,
+        pdfAttached: attachments.length > 0,
+      });
       return { messageId: info.messageId };
     } catch (error) {
       // Wrong user / app password will never fix itself on retry.

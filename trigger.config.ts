@@ -1,3 +1,4 @@
+import { additionalFiles } from "@trigger.dev/build/extensions/core";
 import { defineConfig } from "@trigger.dev/sdk";
 
 export default defineConfig({
@@ -19,4 +20,12 @@ export default defineConfig({
     },
   },
   dirs: ["./src/trigger"],
+  // Run tasks from the build directory locally too, so asset paths built from process.cwd() match production.
+  legacyDevProcessCwdBehaviour: false,
+  build: {
+    // pdfkit/fontkit read their own data files from disk at runtime, so they must stay real node_modules.
+    external: ["pdfkit", "fontkit"],
+    // Logo cut-outs and fonts for the branded PDF report.
+    extensions: [additionalFiles({ files: ["./src/trigger/youtube-analysis/assets/**"] })],
+  },
 });

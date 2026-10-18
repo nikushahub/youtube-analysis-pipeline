@@ -10,15 +10,19 @@
   },
   "dependencies": {
     "@trigger.dev/sdk": "4.7.4",
+    "fontkit": "^2.0.4",
     "google-auth-library": "^11.3.1",
     "nodemailer": "^10.1.2",
+    "pdfkit": "^0.20.2",
     "youtubei.js": "^18.1.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@trigger.dev/build": "4.7.4",
+    "@types/fontkit": "^2.0.9",
     "@types/node": "^26.6.5",
     "@types/nodemailer": "^8.0.2",
+    "@types/pdfkit": "^0.17.6",
     "trigger.dev": "^4.7.4",
     "typescript": "^5.9.3"
   }
