@@ -19,12 +19,23 @@ export const SHEET_HEADERS = [
   "Topics",
 ];
 
+/**
+ * Env vars store the key's line breaks as literal "\n", and dashboards often keep the quotes or spaces
+ * that came with a copy-paste from the JSON file. Undo all of that so the PEM parses.
+ */
+function normalizePrivateKey(raw: string): string {
+  let key = raw.trim();
+  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+    key = key.slice(1, -1);
+  }
+  return key.replace(/\\n/g, "\n").replace(/\r\n/g, "\n").trim() + "\n";
+}
+
 /** Exchanges the service account credentials for a short-lived Sheets access token. */
 export async function getSheetsAccessToken(serviceAccountEmail: string, privateKey: string): Promise<string> {
   const client = new JWT({
     email: serviceAccountEmail,
-    // Env vars store the key's line breaks as literal "\n" — turn them back into real newlines.
-    key: privateKey.replace(/\\n/g, "\n"),
+    key: normalizePrivateKey(privateKey),
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
 
